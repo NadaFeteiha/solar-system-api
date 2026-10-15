@@ -9,15 +9,3 @@ class Planet(db.Model):
     number_of_moons: Mapped[int]
 
 
-
-planets = [
-#     Planet(1, "Mercury", "Terrestrial"),
-#     Planet(2, "Venus", "Terrestrial"),
-#     Planet(3, "Earth", "Terrestrial"),
-#     Planet(4, "Mars", "Terrestrial"),
-#     Planet(5, "Jupiter", "Gas Giant"),
-#     Planet(6, "Saturn", "Gas Giant"),
-#     Planet(7, "Uranus", "Ice Giant"),
-#     Planet(8, "Neptune", "Ice Giant"),
-]
-
