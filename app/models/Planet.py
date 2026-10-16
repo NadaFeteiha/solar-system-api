@@ -8,4 +8,18 @@ class Planet(db.Model):
     description: Mapped[str]
     number_of_moons: Mapped[int]
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "num_moons": self.number_of_moons,
+        }
 
+    @classmethod
+    def from_dict(cls, planet_data):
+        return cls(
+            name=planet_data["name"],
+            description=planet_data["description"],
+            number_of_moons=int(planet_data["num_moons"]),
+        )
