@@ -2,86 +2,62 @@ from flask import Blueprint, abort, make_response, request, Response
 from ..models.Planet import Planet
 from ..db import db
 
-
-planet_bp = Blueprint("planet_bp", __name__, url_prefix="/planet")
-
-
-@planet_bp.get("")
-def hello_planets():
-    return {"message": "Hello form planet"}
+planet_bp = Blueprint("planet_bp", __name__, url_prefix="/planets")
 
 
 @planet_bp.post("")
-def add_planets():
+def create_planet():
     request_body = request.get_json()
+    new_planet = validate_request_body(request_body)
 
-    name = request_body["name"]
-    description = request_body["description"]
-    num_moons = int(request_body["num_moons"])
-
-    new_planet = Planet(name=name, description=description, number_of_moons=num_moons)
     db.session.add(new_planet)
     db.session.commit()
-
-    response = {
-        "id": new_planet.id,
-        "name": new_planet.name,
-        "description": new_planet.description,
-        "num_moons": new_planet.number_of_moons,
-    }
-
-    return response, 201
+    return new_planet.to_dict(), 201
 
 
-@planet_bp.get("/all")
+@planet_bp.get("")
 def get_all_planets():
-    results = []
-    query = db.select(Planet)
+    query = db.select(Planet).order_by(Planet.id)
     planets = db.session.scalars(query)
 
-    for p in planets:
-        results.append(
-            {
-                "id": p.id,
-                "name": p.name,
-                "number_of_moons": p.number_of_moons,
-                "description": p.description,
-            }
-        )
+    response = []
+    for planet in planets:
+        response.append(planet.to_dict())
 
-    return results
+    return response, 200
 
 
 @planet_bp.get("/<planet_id>")
-def get_planet(planet_id):
-
+def get_one_planet(planet_id):
     planet = validate_planet(planet_id)
-
-    return {
-        "id": planet.id,
-        "name": planet.name,
-        "num_moons": planet.number_of_moons,
-        "description": planet.description,
-    }
+    return planet.to_dict(), 200
 
 
 @planet_bp.put("/<planet_id>")
 def update_planet(planet_id):
     planet = validate_planet(planet_id)
-
     request_body = request.get_json()
-    if request_body.get("name"):
+
+    if "name" in request_body:
         planet.name = request_body["name"]
 
-    if request_body.get("description"):
+    if "description" in request_body:
         planet.description = request_body["description"]
 
-    if request_body.get("num_moons"):
-        planet.number_of_moons = int(request_body["num_moons"])
+    if "num_moons" in request_body:
+        try:
+            planet.number_of_moons = int(request_body["num_moons"])
+        except ValueError:
+            abort(
+                make_response(
+                    {"message": "Invalid request: num_moons must be an integer"}, 400
+                )
+            )
 
     db.session.commit()
 
-    return Response(status=204, mimetype="application/json")
+    return planet.to_dict()
+
 
 @planet_bp.delete("/<planet_id>")
 def delete_planet(planet_id):
@@ -93,19 +69,49 @@ def delete_planet(planet_id):
     return Response(status=204, mimetype="application/json")
 
 
-
-def validate_planet(id):
+# ==========================================
+#            helper functions
+# ==========================================
+def validate_planet(planet_id):
     try:
-        id_planet = int(id)
+        planet_id = int(planet_id)
     except ValueError:
-        response = {"message": f"Invalid planet id: {id}"}
-        abort(make_response(response, 400))
+        abort(make_response({"message": f"Planet id {planet_id} invalid"}, 400))
 
-    query = db.select(Planet).where(Planet.id == id_planet)
-    planet = db.session.scalar(query)
+    planet = db.session.get(Planet, planet_id)
 
     if not planet:
-        response = {"message": f"Planet not found: {id}"}
-        abort(make_response(response, 404))
-    else:
-        return planet
+        abort(make_response({"message": f"Planet {planet_id} not found"}, 404))
+
+    return planet
+
+
+def validate_request_body(request_body):
+    try:
+        if (
+            "name" not in request_body
+            or "description" not in request_body
+            or "num_moons" not in request_body
+        ):
+            abort(
+                make_response(
+                    {
+                        "message": "Invalid data should have name, description, num_moons"
+                    },
+                    400,
+                )
+            )
+
+        new_planet = Planet(
+            name=request_body["name"],
+            description=request_body["description"],
+            number_of_moons=int(request_body["num_moons"]),
+        )
+
+    except ValueError:
+        abort(
+            make_response(
+                {"message": "Invalid request: num_moons must be an integer"}, 400
+            )
+        )
+    return new_planet
