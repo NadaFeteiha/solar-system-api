@@ -48,7 +48,11 @@ def update_planet(planet_id):
         try:
             planet.number_of_moons = int(request_body["num_moons"])
         except ValueError:
-            abort(make_response({"message": "Invalid request: num_moons must be an integer"}, 400))
+            abort(
+                make_response(
+                    {"message": "Invalid request: num_moons must be an integer"}, 400
+                )
+            )
 
     db.session.commit()
 
@@ -84,11 +88,30 @@ def validate_planet(planet_id):
 
 def validate_request_body(request_body):
     try:
-        if "name" not in request_body or "description" not in request_body or "num_moons" not in request_body:
-            abort(make_response({"message": "Invalid data should have name, description, num_moons"}, 400))
-        int(request_body.get("num_moons"))
+        if (
+            "name" not in request_body
+            or "description" not in request_body
+            or "num_moons" not in request_body
+        ):
+            abort(
+                make_response(
+                    {
+                        "message": "Invalid data should have name, description, num_moons"
+                    },
+                    400,
+                )
+            )
 
-        new_planet = Planet.from_dict(request_body)
+        new_planet = Planet(
+            name=request_body["name"],
+            description=request_body["description"],
+            number_of_moons=int(request_body["num_moons"]),
+        )
+
     except ValueError:
-        abort(make_response({"message": "Invalid request: num_moons must be an integer"}, 400))
+        abort(
+            make_response(
+                {"message": "Invalid request: num_moons must be an integer"}, 400
+            )
+        )
     return new_planet
