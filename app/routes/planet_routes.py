@@ -17,7 +17,34 @@ def create_planet():
 
 @planet_bp.get("")
 def get_all_planets():
-    query = db.select(Planet).order_by(Planet.id)
+    query = db.select(Planet)
+
+    name_param = request.args.get("name")
+    if name_param:
+        query = query.where(Planet.name.ilike(f"%{name_param}%"))
+
+    description_param = request.args.get("description")
+    if description_param:
+        query = query.where(Planet.description.ilike(f"%{description_param}%"))
+
+    min_moons_param = request.args.get("min_moons")
+    if min_moons_param:
+        min_moons = validate_int_param("min_moons", min_moons_param)
+        query = query.where(Planet.number_of_moons >= min_moons)
+
+    max_moons_param = request.args.get("max_moons")
+    if max_moons_param:
+        max_moons = validate_int_param("max_moons", max_moons_param)
+        query = query.where(Planet.number_of_moons <= max_moons)
+
+    sort_param = request.args.get("sort")
+    if sort_param == "name":
+        query = query.order_by(Planet.name)
+    elif sort_param == "num_moons":
+        query = query.order_by(Planet.number_of_moons)
+    else:
+        query = query.order_by(Planet.id)
+
     planets = db.session.scalars(query)
 
     response = []
@@ -56,7 +83,7 @@ def update_planet(planet_id):
 
     db.session.commit()
 
-    return planet.to_dict()
+    return planet.to_dict(), 200
 
 
 @planet_bp.delete("/<planet_id>")
@@ -84,6 +111,17 @@ def validate_planet(planet_id):
         abort(make_response({"message": f"Planet {planet_id} not found"}, 404))
 
     return planet
+
+
+def validate_int_param(param_name, value):
+    try:
+        return int(value)
+    except ValueError:
+        abort(
+            make_response(
+                {"message": f"Invalid request: {param_name} must be an integer"}, 400
+            )
+        )
 
 
 def validate_request_body(request_body):
