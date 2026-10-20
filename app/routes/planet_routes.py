@@ -1,11 +1,12 @@
 from flask import Blueprint, abort, make_response, request, Response
 from ..models.Planet import Planet
 from ..db import db
+from .route_utilities import validate_model
 
-planet_bp = Blueprint("planet_bp", __name__, url_prefix="/planets")
+bp = Blueprint("planet_bp", __name__, url_prefix="/planets")
 
 
-@planet_bp.post("")
+@bp.post("")
 def create_planet():
     request_body = request.get_json()
     new_planet = validate_request_body(request_body)
@@ -15,7 +16,7 @@ def create_planet():
     return new_planet.to_dict(), 201
 
 
-@planet_bp.get("")
+@bp.get("")
 def get_all_planets():
     query = db.select(Planet)
 
@@ -60,15 +61,15 @@ def get_all_planets():
     return response, 200
 
 
-@planet_bp.get("/<planet_id>")
+@bp.get("/<planet_id>")
 def get_one_planet(planet_id):
-    planet = validate_planet(planet_id)
+    planet = validate_model(Planet,planet_id)
     return planet.to_dict(), 200
 
 
-@planet_bp.put("/<planet_id>")
+@bp.put("/<planet_id>")
 def update_planet(planet_id):
-    planet = validate_planet(planet_id)
+    planet = validate_model(Planet, planet_id)
     request_body = request.get_json()
 
     if "name" in request_body:
@@ -92,9 +93,9 @@ def update_planet(planet_id):
     return planet.to_dict(), 200
 
 
-@planet_bp.delete("/<planet_id>")
+@bp.delete("/<planet_id>")
 def delete_planet(planet_id):
-    planet = validate_planet(planet_id)
+    planet = validate_model(Planet, planet_id)
 
     db.session.delete(planet)
     db.session.commit()
@@ -105,18 +106,6 @@ def delete_planet(planet_id):
 # ==========================================
 #            helper functions
 # ==========================================
-def validate_planet(planet_id):
-    try:
-        planet_id = int(planet_id)
-    except ValueError:
-        abort(make_response({"message": f"Planet id {planet_id} invalid"}, 400))
-
-    planet = db.session.get(Planet, planet_id)
-
-    if not planet:
-        abort(make_response({"message": f"Planet {planet_id} not found"}, 404))
-
-    return planet
 
 
 def validate_int_param(param_name, value):
@@ -146,11 +135,7 @@ def validate_request_body(request_body):
                 )
             )
 
-        new_planet = Planet(
-            name=request_body["name"],
-            description=request_body["description"],
-            number_of_moons=int(request_body["num_moons"]),
-        )
+        new_planet = Planet.from_dict(request_body)
 
     except ValueError:
         abort(
