@@ -46,7 +46,4 @@ def one_planet(app):
     db.session.add(planet)
     db.session.commit()
 
-    query = db.select(Planet).where(Planet.id == planet.id)
-    planet_db = db.session.scalar(query)
-
-    return planet_db
+    return db.session.get(Planet, 1)

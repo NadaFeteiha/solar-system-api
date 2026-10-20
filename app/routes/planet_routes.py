@@ -39,11 +39,17 @@ def get_all_planets():
 
     sort_param = request.args.get("sort")
     if sort_param == "name":
-        query = query.order_by(Planet.name)
+        sort_column = Planet.name
     elif sort_param == "num_moons":
-        query = query.order_by(Planet.number_of_moons)
+        sort_column = Planet.number_of_moons
     else:
-        query = query.order_by(Planet.id)
+        sort_column = Planet.id
+
+    order_param = request.args.get("order")
+    if order_param == "desc":
+        query = query.order_by(sort_column.desc())
+    else:
+        query = query.order_by(sort_column.asc())
 
     planets = db.session.scalars(query)
 

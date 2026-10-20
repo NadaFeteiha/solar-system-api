@@ -46,3 +46,14 @@ def test_create_planets_successfully(client):
     assert response_body["name"] == "Mercury"
     assert response_body["description"] == "Smallest rocky planet, closest to the Sun"
     assert response_body["num_moons"] == 0
+
+
+def test_get_all_planets_with_records(client, one_planet):
+    response = client.get("/planets")
+    response_body = response.get_json()
+
+    assert response.status_code == 200
+    assert len(response_body) == 1
+    assert response_body[0].get("name") == one_planet.name
+    assert response_body[0].get("description") == one_planet.description
+    assert response_body[0].get("num_moons") == one_planet.number_of_moons

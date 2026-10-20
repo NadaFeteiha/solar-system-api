@@ -2,6 +2,9 @@ from flask import Flask
 from .routes.planet_routes import planet_bp
 from .db import db, migrate
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def create_app(config=None):
