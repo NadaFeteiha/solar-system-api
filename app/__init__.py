@@ -1,6 +1,7 @@
 from flask import Flask
 from .routes.planet_routes import bp as planet_bp
 from .db import db, migrate
+from .models.Moon import Moon
 import os
 from dotenv import load_dotenv
 

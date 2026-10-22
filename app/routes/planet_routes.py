@@ -1,7 +1,7 @@
 from flask import Blueprint, abort, make_response, request, Response
 from ..models.Planet import Planet
 from ..db import db
-from .route_utilities import validate_model
+from .route_utilities import validate_model, validate_int_param, validate_request_body
 
 bp = Blueprint("planet_bp", __name__, url_prefix="/planets")
 
@@ -9,7 +9,7 @@ bp = Blueprint("planet_bp", __name__, url_prefix="/planets")
 @bp.post("")
 def create_planet():
     request_body = request.get_json()
-    new_planet = validate_request_body(request_body)
+    new_planet = validate_request_body(Planet, request_body)
 
     db.session.add(new_planet)
     db.session.commit()
@@ -63,7 +63,7 @@ def get_all_planets():
 
 @bp.get("/<planet_id>")
 def get_one_planet(planet_id):
-    planet = validate_model(Planet,planet_id)
+    planet = validate_model(Planet, planet_id)
     return planet.to_dict(), 200
 
 
@@ -102,45 +102,3 @@ def delete_planet(planet_id):
 
     return Response(status=204, mimetype="application/json")
 
-
-# ==========================================
-#            helper functions
-# ==========================================
-
-
-def validate_int_param(param_name, value):
-    try:
-        return int(value)
-    except ValueError:
-        abort(
-            make_response(
-                {"message": f"Invalid request: {param_name} must be an integer"}, 400
-            )
-        )
-
-
-def validate_request_body(request_body):
-    try:
-        if (
-            "name" not in request_body
-            or "description" not in request_body
-            or "num_moons" not in request_body
-        ):
-            abort(
-                make_response(
-                    {
-                        "message": "Invalid data should have name, description, num_moons"
-                    },
-                    400,
-                )
-            )
-
-        new_planet = Planet.from_dict(request_body)
-
-    except ValueError:
-        abort(
-            make_response(
-                {"message": "Invalid request: num_moons must be an integer"}, 400
-            )
-        )
-    return new_planet
