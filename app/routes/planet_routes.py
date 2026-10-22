@@ -1,7 +1,14 @@
 from flask import Blueprint, abort, make_response, request, Response
 from ..models.Planet import Planet
+from ..models.Moon import Moon
 from ..db import db
-from .route_utilities import validate_model
+from .route_utilities import (
+    validate_model,
+    validate_int_param,
+    create_model_with_response,
+    get_models_with_filters,
+    update_model_with_response,
+)
 
 bp = Blueprint("planet_bp", __name__, url_prefix="/planets")
 
@@ -9,88 +16,47 @@ bp = Blueprint("planet_bp", __name__, url_prefix="/planets")
 @bp.post("")
 def create_planet():
     request_body = request.get_json()
-    new_planet = validate_request_body(request_body)
-
-    db.session.add(new_planet)
-    db.session.commit()
-    return new_planet.to_dict(), 201
+    return create_model_with_response(Planet, request_body)
 
 
 @bp.get("")
 def get_all_planets():
+    filters = dict(request.args)
     query = db.select(Planet)
 
-    name_param = request.args.get("name")
-    if name_param:
-        query = query.where(Planet.name.ilike(f"%{name_param}%"))
-
-    description_param = request.args.get("description")
-    if description_param:
-        query = query.where(Planet.description.ilike(f"%{description_param}%"))
-
-    min_moons_param = request.args.get("min_moons")
+    min_moons_param = filters.pop("min_moons", None)
     if min_moons_param:
         min_moons = validate_int_param("min_moons", min_moons_param)
         query = query.where(Planet.number_of_moons >= min_moons)
 
-    max_moons_param = request.args.get("max_moons")
+    max_moons_param = filters.pop("max_moons", None)
     if max_moons_param:
         max_moons = validate_int_param("max_moons", max_moons_param)
         query = query.where(Planet.number_of_moons <= max_moons)
 
-    sort_param = request.args.get("sort")
-    if sort_param == "name":
-        sort_column = Planet.name
-    elif sort_param == "num_moons":
-        sort_column = Planet.number_of_moons
-    else:
-        sort_column = Planet.id
+    if filters.get("sort") == "num_moons":
+        filters["sort"] = "number_of_moons"
 
-    order_param = request.args.get("order")
-    if order_param == "desc":
-        query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(sort_column.asc())
-
-    planets = db.session.scalars(query)
-
-    response = []
-    for planet in planets:
-        response.append(planet.to_dict())
-
-    return response, 200
+    return get_models_with_filters(Planet, filters, query), 200
 
 
 @bp.get("/<planet_id>")
 def get_one_planet(planet_id):
-    planet = validate_model(Planet,planet_id)
+    planet = validate_model(Planet, planet_id)
     return planet.to_dict(), 200
 
 
 @bp.put("/<planet_id>")
 def update_planet(planet_id):
     planet = validate_model(Planet, planet_id)
-    request_body = request.get_json()
-
-    if "name" in request_body:
-        planet.name = request_body["name"]
-
-    if "description" in request_body:
-        planet.description = request_body["description"]
+    request_body = dict(request.get_json())
 
     if "num_moons" in request_body:
-        try:
-            planet.number_of_moons = int(request_body["num_moons"])
-        except ValueError:
-            abort(
-                make_response(
-                    {"message": "Invalid request: num_moons must be an integer"}, 400
-                )
-            )
+        request_body["number_of_moons"] = validate_int_param(
+            "num_moons", request_body.pop("num_moons")
+        )
 
-    db.session.commit()
-
-    return planet.to_dict(), 200
+    return update_model_with_response(planet, request_body)
 
 
 @bp.delete("/<planet_id>")
@@ -103,44 +69,39 @@ def delete_planet(planet_id):
     return Response(status=204, mimetype="application/json")
 
 
-# ==========================================
-#            helper functions
-# ==========================================
+@bp.post("/<planet_id>/moons")
+def create_moon_with_planet(planet_id):
+    planet = validate_model(Planet, planet_id)
+    request_body = request.get_json()
+    request_body["planet_id"] = planet.id
+    return create_model_with_response(Moon, request_body)
 
 
-def validate_int_param(param_name, value):
-    try:
-        return int(value)
-    except ValueError:
+@bp.get("/<planet_id>/moons")
+def get_moons_by_planet(planet_id):
+    planet = validate_model(Planet, planet_id)
+
+    response = []
+    for moon in planet.moons:
+        response.append(moon.to_dict())
+
+    return response, 200
+
+
+@bp.delete("/<planet_id>/moons/<moon_id>")
+def remove_moon_from_planet(planet_id, moon_id):
+    planet = validate_model(Planet, planet_id)
+    moon = validate_model(Moon, moon_id)
+
+    if moon.planet_id != planet.id:
         abort(
             make_response(
-                {"message": f"Invalid request: {param_name} must be an integer"}, 400
+                {"message": f"Moon {moon_id} does not belong to Planet {planet_id}"},
+                404,
             )
         )
 
+    moon.planet = None
+    db.session.commit()
 
-def validate_request_body(request_body):
-    try:
-        if (
-            "name" not in request_body
-            or "description" not in request_body
-            or "num_moons" not in request_body
-        ):
-            abort(
-                make_response(
-                    {
-                        "message": "Invalid data should have name, description, num_moons"
-                    },
-                    400,
-                )
-            )
-
-        new_planet = Planet.from_dict(request_body)
-
-    except ValueError:
-        abort(
-            make_response(
-                {"message": "Invalid request: num_moons must be an integer"}, 400
-            )
-        )
-    return new_planet
+    return Response(status=204, mimetype="application/json")
