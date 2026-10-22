@@ -41,7 +41,7 @@ def validate_request_body(cls, request_body):
 
 
 def get_column(cls, attribute):
-    if attribute not in cls.__table__.columns:
+    if not hasattr(cls, attribute):
         abort(
             make_response(
                 {"message": f"Invalid filter: {attribute} is not a valid attribute"},
@@ -65,11 +65,12 @@ def get_models_with_filters(cls, filters, query=None):
         elif key == "order":
             order = value
         else:
-            column = get_column(cls, key)
-            if column.type.python_type is str:
-                query = query.where(column.ilike(f"%{value}%"))
-            else:
-                query = query.where(column == validate_int_param(key, value))
+            if hasattr(cls, key):
+                column = get_column(cls, key)
+                if column.type.python_type is str:
+                    query = query.where(column.ilike(f"%{value}%"))
+                else:
+                    query = query.where(column == validate_int_param(key, value))
 
     if order == "desc":
         query = query.order_by(sort_column.desc())
@@ -89,7 +90,9 @@ def update_model_with_response(model, request_body):
 
     for key, value in request_body.items():
         if key == "id":
-            abort(make_response({"message": "Invalid request: id cannot be updated"}, 400))
+            abort(
+                make_response({"message": "Invalid request: id cannot be updated"}, 400)
+            )
 
         column = get_column(cls, key)
         if column.type.python_type is int and value is not None:
