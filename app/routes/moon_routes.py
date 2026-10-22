@@ -1,7 +1,12 @@
-from flask import Blueprint, abort, make_response, request, Response
+from flask import Blueprint, request, Response
 from ..models.Moon import Moon
 from ..db import db
-from .route_utilities import validate_model, validate_int_param, validate_request_body
+from .route_utilities import (
+    validate_model,
+    validate_request_body,
+    get_models_with_filters,
+    create_model_with_response,
+)
 
 bp = Blueprint("moon_bp", __name__, url_prefix="/moons")
 
@@ -9,41 +14,38 @@ bp = Blueprint("moon_bp", __name__, url_prefix="/moons")
 @bp.post("")
 def create_moon():
     request_body = request.get_json()
-    new_moon = validate_request_body(Moon, request_body)
-
-    db.session.add(new_moon)
-    db.session.commit()
-    return new_moon.to_dict(), 201
+    return create_model_with_response(Moon, request_body)
 
 
 @bp.get("")
 def get_all_moons():
-    query = db.select(Moon)
+    return get_models_with_filters(Moon, request.args)
 
-    size_param = request.args.get("size")
-    if size_param:
-        query = query.where(Moon.size.ilike(f"%{size_param}%"))
 
-    description_param = request.args.get("description")
-    if description_param:
-        query = query.where(Moon.description.ilike(f"%{description_param}%"))
+@bp.get("/<moon_id>")
+def get_one_moon(moon_id):
+    moon = validate_model(Moon, moon_id)
+    return moon.to_dict()
 
-    sort_param = request.args.get("sort")
-    if sort_param == "size":
-        sort_column = Moon.size
-    else:
-        sort_column = Moon.id
 
-    order_param = request.args.get("order")
-    if order_param == "desc":
-        query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(sort_column.asc())
+@bp.put("/<moon_id>")
+def update_moon(moon_id):
+    moon = validate_model(Moon, moon_id)
+    request_body = request.get_json()
+    updated_moon = validate_request_body(Moon, request_body)
 
-    moons = db.session.scalars(query)
+    moon.size = updated_moon.size
+    moon.description = updated_moon.description
 
-    response = []
-    for moon in moons:
-        response.append(moon.to_dict())
+    db.session.commit()
 
-    return make_response(response, 200)
+    return Response(status=204, mimetype="application/json")  # 204 No Content
+
+
+@bp.delete("/<moon_id>")
+def delete_moon(moon_id):
+    moon = validate_model(Moon, moon_id)
+    db.session.delete(moon)
+    db.session.commit()
+
+    return Response(status=204, mimetype="application/json")
