@@ -41,15 +41,19 @@ def validate_request_body(cls, request_body):
 
 
 def get_column(cls, attribute):
-    if not hasattr(cls, attribute):
-        abort(
-            make_response(
-                {"message": f"Invalid filter: {attribute} is not a valid attribute"},
-                400,
-            )
-        )
+    invalid_response = make_response(
+        {"message": f"Invalid attribute: {attribute}"}, 400
+    )
 
-    return getattr(cls, attribute)
+    if not hasattr(cls, attribute):
+        abort(invalid_response)
+
+    column = getattr(cls, attribute)
+
+    if not hasattr(column, "type"):
+        abort(invalid_response)
+
+    return column
 
 
 def get_models_with_filters(cls, filters, query=None):
@@ -65,12 +69,11 @@ def get_models_with_filters(cls, filters, query=None):
         elif key == "order":
             order = value
         else:
-            if hasattr(cls, key):
-                column = get_column(cls, key)
-                if column.type.python_type is str:
-                    query = query.where(column.ilike(f"%{value}%"))
-                else:
-                    query = query.where(column == validate_int_param(key, value))
+            column = get_column(cls, key)
+            if column.type.python_type is str:
+                query = query.where(column.ilike(f"%{value}%"))
+            else:
+                query = query.where(column == validate_int_param(key, value))
 
     if order == "desc":
         query = query.order_by(sort_column.desc())
