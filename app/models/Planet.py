@@ -1,6 +1,5 @@
-from app.models.Moon import Moon
-
 from ..db import db
+from .Moon import Moon
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 
@@ -17,6 +16,7 @@ class Planet(db.Model):
             "name": self.name,
             "description": self.description,
             "num_moons": self.number_of_moons,
+            "moons": [moon.to_dict() for moon in self.moons],
         }
 
     @classmethod

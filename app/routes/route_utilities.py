@@ -40,26 +40,66 @@ def validate_request_body(cls, request_body):
     return new_model
 
 
-def get_models_with_filters(cls, filters):
-    query = db.session.query(cls)
+def get_column(cls, attribute):
+    if attribute not in cls.__table__.columns:
+        abort(
+            make_response(
+                {"message": f"Invalid filter: {attribute} is not a valid attribute"},
+                400,
+            )
+        )
+
+    return getattr(cls, attribute)
+
+
+def get_models_with_filters(cls, filters, query=None):
+    if query is None:
+        query = db.select(cls)
+
+    sort_column = cls.id
+    order = "asc"
 
     for key, value in filters.items():
-        if hasattr(cls, key):
-            column = getattr(cls, key)
-            query = query.filter(column == value)
+        if key == "sort":
+            sort_column = get_column(cls, value)
+        elif key == "order":
+            order = value
         else:
-            abort(
-                make_response(
-                    {"message": f"Invalid filter: {key} is not a valid attribute"}, 400
-                )
-            )
+            column = get_column(cls, key)
+            if column.type.python_type is str:
+                query = query.where(column.ilike(f"%{value}%"))
+            else:
+                query = query.where(column == validate_int_param(key, value))
 
-    models = query.all()
+    if order == "desc":
+        query = query.order_by(sort_column.desc())
+    else:
+        query = query.order_by(sort_column.asc())
+
+    models = db.session.scalars(query)
     model_dicts = []
     for model in models:
         model_dicts.append(model.to_dict())
 
     return model_dicts
+
+
+def update_model_with_response(model, request_body):
+    cls = type(model)
+
+    for key, value in request_body.items():
+        if key == "id":
+            abort(make_response({"message": "Invalid request: id cannot be updated"}, 400))
+
+        column = get_column(cls, key)
+        if column.type.python_type is int and value is not None:
+            value = validate_int_param(key, value)
+
+        setattr(model, key, value)
+
+    db.session.commit()
+
+    return model.to_dict(), 200
 
 
 def create_model_with_response(cls, request_body):
