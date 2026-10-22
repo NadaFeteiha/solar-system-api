@@ -15,6 +15,10 @@ bp = Blueprint("moon_bp", __name__, url_prefix="/moons")
 @bp.post("")
 def create_moon():
     request_body = request.get_json()
+
+    if request_body.get("planet_id") is not None:
+        validate_model(Planet, request_body["planet_id"])
+    
     return create_model_with_response(Moon, request_body)
 
 
